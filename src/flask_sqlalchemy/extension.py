@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import types
 import typing as t
 from weakref import WeakKeyDictionary
 
@@ -14,8 +15,11 @@ from flask import Flask
 from flask import has_app_context
 
 from .model import _QueryProperty
+from .model import BindMixin
 from .model import DefaultMeta
 from .model import Model
+from .model import NameMixin
+from .model import ReprMixin
 from .pagination import Pagination
 from .pagination import SelectPagination
 from .query import Query
@@ -482,7 +486,7 @@ class SQLAlchemy:
         return Table
 
     def _make_declarative_base(
-        self, model: type[Model] | sa.orm.DeclarativeMeta
+        self, model: type[Model] | sa.orm.DeclarativeMeta | sa.orm.DeclarativeBase
     ) -> type[t.Any]:
         """Create a SQLAlchemy declarative model class. The result is available as
         :attr:`Model`.
@@ -503,7 +507,15 @@ class SQLAlchemy:
         .. versionchanged:: 2.3
             ``model`` can be an already created declarative model class.
         """
-        if (
+        if model is sa.orm.DeclarativeBase:
+            body = {"__fsa__": self}
+            model = types.new_class(
+                "Base",
+                (BindMixin, NameMixin, ReprMixin, sa.orm.DeclarativeBase),
+                {"metaclass": type(sa.orm.DeclarativeBase)},
+                lambda ns: ns.update(body),
+            )
+        elif (
             not isinstance(model, sa.orm.DeclarativeMeta)
             and not issubclass(model, sa.orm.DeclarativeBase)
             and not issubclass(model, sa.orm.DeclarativeBaseNoMeta)
